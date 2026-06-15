@@ -39,7 +39,7 @@ async def run_worker(client: Client | None = None) -> None:
             notify_customer_activity,
         ],
     )
-    print(f"Worker started, listening on task queue: {TASK_QUEUE}")
+    print(f"Worker started ok, listening on task queue: {TASK_QUEUE}")
     await worker.run()
 
 
