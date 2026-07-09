@@ -33,6 +33,11 @@ export function KitchenDisplay() {
     setStoreOnline(true)
   }
 
+  const handleUnplug = async () => {
+    await fetch('/api/store/go-offline', { method: 'POST' })
+    setStoreOnline(false)
+  }
+
   const handleMarkReady = async (orderId: string) => {
     await fetch(`/api/store/order-ready/${orderId}`, { method: 'POST' })
     fetchStatus()
@@ -90,9 +95,18 @@ export function KitchenDisplay() {
             <p className="text-xs text-gray-400">Déjà Vu Tacos #42</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-xs text-green-400 font-medium">Online</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-xs text-green-400 font-medium">Online</span>
+          </div>
+          <button
+            onClick={handleUnplug}
+            className="group inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 text-gray-200 rounded-lg text-xs font-bold hover:bg-red-600 hover:text-white active:scale-95 transition-all"
+          >
+            <span className="group-hover:animate-bounce">🔌</span>
+            Unplug the Cable Again
+          </button>
         </div>
       </div>
 

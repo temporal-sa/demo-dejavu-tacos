@@ -4,7 +4,7 @@ import asyncio
 import os
 from uuid import uuid4
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 
@@ -106,7 +106,9 @@ async def update_settings(new_settings: Settings):
 
 @app.post("/api/orders")
 async def create_order(
-    order_request: CreateOrderRequest, background_tasks: BackgroundTasks
+    order_request: CreateOrderRequest,
+    background_tasks: BackgroundTasks,
+    x_session_id: str | None = Header(default=None),
 ):
     order_id = uuid4().hex[:8]
     total = round(
@@ -116,6 +118,11 @@ async def create_order(
 
     config.orders[order_id] = order.model_dump(mode="json")
     config.event_queues[order_id] = asyncio.Queue()
+    # Remember which browser session placed this order so store connectivity is
+    # evaluated per-session when submit_to_store runs.
+    config.touch_session(x_session_id)
+    if x_session_id:
+        config.order_sessions[order_id] = x_session_id
 
     workflow_id = ""
     run_id = ""
@@ -174,32 +181,45 @@ async def order_events(order_id: str):
 
 
 @app.get("/api/store/status")
-async def store_status():
-    return {"online": config.store_online}
+async def store_status(x_session_id: str | None = Header(default=None)):
+    # The KDS polls this every couple seconds — piggyback the idle-session sweep.
+    config.touch_session(x_session_id)
+    config.sweep_sessions()
+    return {"online": config.is_store_online(x_session_id)}
 
 
 @app.post("/api/store/toggle-connection")
-async def toggle_store_connection():
-    config.store_online = not config.store_online
-    return {"online": config.store_online}
+async def toggle_store_connection(x_session_id: str | None = Header(default=None)):
+    new_value = not config.is_store_online(x_session_id)
+    config.set_store_online(x_session_id, new_value)
+    return {"online": new_value}
 
 
 @app.post("/api/store/go-online")
-async def store_go_online():
-    config.store_online = True
+async def store_go_online(x_session_id: str | None = Header(default=None)):
+    config.set_store_online(x_session_id, True)
     return {"online": True}
 
 
 @app.post("/api/store/go-offline")
-async def store_go_offline():
-    config.store_online = False
+async def store_go_offline(x_session_id: str | None = Header(default=None)):
+    config.set_store_online(x_session_id, False)
     return {"online": False}
 
 
 @app.get("/api/store/orders")
-async def get_store_orders():
-    """Return orders the store has actually received (via submit_to_store)."""
-    return list(config.store_orders.values())
+async def get_store_orders(x_session_id: str | None = Header(default=None)):
+    """Return orders the store has actually received (via submit_to_store).
+
+    Scoped to the requesting browser session so concurrent demos don't see each
+    other's orders; callers without a session (cross-language tooling) see all."""
+    if not x_session_id:
+        return list(config.store_orders.values())
+    return [
+        order
+        for order_id, order in config.store_orders.items()
+        if config.order_sessions.get(order_id) == x_session_id
+    ]
 
 
 @app.post("/api/store/order-ready/{order_id}")
@@ -229,6 +249,15 @@ async def mark_order_ready(order_id: str):
     return {"status": "signaled", "order_id": order_id}
 
 
+@app.post("/api/session/end")
+async def end_session(session_id: str = ""):
+    """Drop a browser session's state. Called via navigator.sendBeacon on tab
+    close / navigate-away, so the id arrives as a query param (beacons can't set
+    custom headers). Idle sessions are also swept after SESSION_TTL_SECONDS."""
+    config.end_session(session_id)
+    return {"status": "ended"}
+
+
 # ---------------------------------------------------------------------------
 # Internal: used by external worker process
 # ---------------------------------------------------------------------------
@@ -249,9 +278,13 @@ async def push_event(event: OrderEvent):
 
 
 @app.get("/api/internal/should-fail/{step}")
-async def check_should_fail(step: str):
-    """Check if a step should fail based on current failure scenario."""
-    return {"should_fail": config.should_fail(step)}
+async def check_should_fail(step: str, order_id: str = ""):
+    """Check if a step should fail based on current failure scenario.
+
+    order_id (when supplied by the worker) resolves the browser session that
+    placed the order so connectivity is evaluated per-session."""
+    session_id = config.order_sessions.get(order_id) if order_id else None
+    return {"should_fail": config.should_fail(step, session_id)}
 
 
 @app.post("/api/internal/store-orders/{order_id}")

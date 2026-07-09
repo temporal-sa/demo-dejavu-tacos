@@ -15,17 +15,23 @@ class StoreError(Exception):
     pass
 
 
-async def _check_should_fail(step: str) -> bool:
-    """Check failure state via backend API (external) or local config (in-process)."""
+async def _check_should_fail(step: str, order_id: str = "") -> bool:
+    """Check failure state via backend API (external) or local config (in-process).
+
+    order_id lets the backend resolve which browser session gates this order, so
+    store connectivity is evaluated per-session rather than globally."""
     if _BACKEND_URL:
         try:
+            params = {"order_id": order_id} if order_id else None
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"{_BACKEND_URL}/api/internal/should-fail/{step}") as resp:
+                async with session.get(
+                    f"{_BACKEND_URL}/api/internal/should-fail/{step}", params=params
+                ) as resp:
                     data = await resp.json()
                     return data.get("should_fail", False)
         except Exception:
             return False
-    return should_fail(step)
+    return should_fail(step, config.order_sessions.get(order_id))
 
 
 async def _register_store_order(order_id: str, order_data: dict) -> None:
@@ -60,7 +66,7 @@ async def validate_store(store_id: str = "store-001") -> dict:
 async def submit_to_store(order_id: str, items: list[dict]) -> dict:
     """Submit the order to the store's kitchen system."""
     await asyncio.sleep(0.5)
-    if await _check_should_fail("submit_to_store"):
+    if await _check_should_fail("submit_to_store", order_id):
         raise StoreError(
             "Store connectivity lost — Bob accidentally unplugged the ethernet"
         )
