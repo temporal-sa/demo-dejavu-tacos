@@ -5,7 +5,7 @@ import asyncio
 from temporalio.client import Client
 from temporalio.worker import Worker
 
-from dejavu_tacos.temporal_client import connect_temporal_client
+from dejavu_tacos.temporal_client import connect_temporal_client, temporal_task_queue
 from dejavu_workflows.activities import (
     authorize_payment_activity,
     capture_payment_activity,
@@ -16,7 +16,7 @@ from dejavu_workflows.activities import (
     validate_order_activity,
     validate_store_activity,
 )
-from dejavu_workflows.order_workflow import TASK_QUEUE, OrderWorkflow
+from dejavu_workflows.order_workflow import OrderWorkflow
 
 
 async def run_worker(client: Client | None = None) -> None:
@@ -24,9 +24,10 @@ async def run_worker(client: Client | None = None) -> None:
     if client is None:
         client = await connect_temporal_client()
 
+    task_queue = temporal_task_queue()
     worker = Worker(
         client,
-        task_queue=TASK_QUEUE,
+        task_queue=task_queue,
         workflows=[OrderWorkflow],
         activities=[
             validate_order_activity,
@@ -39,7 +40,7 @@ async def run_worker(client: Client | None = None) -> None:
             notify_customer_activity,
         ],
     )
-    print(f"Worker started ok, listening on task queue: {TASK_QUEUE}")
+    print(f"Worker started ok, listening on task queue: {task_queue}")
     await worker.run()
 
 

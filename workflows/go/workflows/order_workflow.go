@@ -9,7 +9,8 @@ import (
 	"github.com/mikeacjones/dejavu-tacos-temporal-oms-demo/workflows/go/activities"
 )
 
-const TaskQueue = "dejavu-tacos"
+// DefaultTaskQueue is used when TEMPORAL_TASK_QUEUE is not set.
+const DefaultTaskQueue = "dejavu-tacos"
 
 // OrderWorkflow orchestrates the order processing pipeline.
 // Registered as "OrderWorkflow" to match the Python backend's string-based start.

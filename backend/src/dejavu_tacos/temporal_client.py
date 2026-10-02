@@ -13,6 +13,13 @@ def _env_flag(name: str, *, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+DEFAULT_TASK_QUEUE = "dejavu-tacos"
+
+
+def temporal_task_queue() -> str:
+    return os.environ.get("TEMPORAL_TASK_QUEUE") or DEFAULT_TASK_QUEUE
+
+
 def temporal_target_host() -> str:
     return (
         os.environ.get("TEMPORAL_ENDPOINT")

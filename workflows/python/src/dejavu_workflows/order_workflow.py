@@ -18,8 +18,6 @@ with workflow.unsafe.imports_passed_through():
         validate_store_activity,
     )
 
-TASK_QUEUE = "dejavu-tacos"
-
 DEFAULT_RETRY = RetryPolicy(maximum_attempts=3)
 
 

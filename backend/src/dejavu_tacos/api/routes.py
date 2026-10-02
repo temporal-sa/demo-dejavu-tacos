@@ -18,7 +18,7 @@ from dejavu_tacos.models import (
     Settings,
     StepStatus,
 )
-from dejavu_tacos.temporal_client import connect_temporal_client
+from dejavu_tacos.temporal_client import connect_temporal_client, temporal_task_queue
 from dejavu_tacos.temporal_ui import (
     temporal_namespace,
     temporal_namespace_url,
@@ -142,7 +142,7 @@ async def create_order(
                 "total": total,
             },
             id=workflow_id,
-            task_queue="dejavu-tacos",
+            task_queue=temporal_task_queue(),
         )
         run_id = handle.first_execution_run_id or handle.run_id or ""
         workflow_ui_url = temporal_workflow_url(

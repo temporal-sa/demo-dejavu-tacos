@@ -23,6 +23,11 @@ func main() {
 		backendURL = "http://localhost:8000"
 	}
 
+	taskQueue := os.Getenv("TEMPORAL_TASK_QUEUE")
+	if taskQueue == "" {
+		taskQueue = wf.DefaultTaskQueue
+	}
+
 	c, err := client.Dial(client.Options{
 		HostPort: temporalAddr,
 	})
@@ -31,7 +36,7 @@ func main() {
 	}
 	defer c.Close()
 
-	w := worker.New(c, wf.TaskQueue, worker.Options{})
+	w := worker.New(c, taskQueue, worker.Options{})
 
 	// Register workflow — name must match what the Python backend starts
 	w.RegisterWorkflowWithOptions(wf.OrderWorkflow, workflow.RegisterOptions{
@@ -44,7 +49,7 @@ func main() {
 	}
 	w.RegisterActivity(acts)
 
-	log.Printf("Go worker started, listening on task queue: %s", wf.TaskQueue)
+	log.Printf("Go worker started, listening on task queue: %s", taskQueue)
 	log.Printf("Backend URL: %s", backendURL)
 	log.Printf("Temporal address: %s", temporalAddr)
 

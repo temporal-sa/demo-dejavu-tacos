@@ -4,6 +4,7 @@ import { BackendClient } from "./backend-client";
 
 async function main() {
   const temporalAddr = process.env.TEMPORAL_ADDRESS || "localhost:7233";
+  const taskQueue = process.env.TEMPORAL_TASK_QUEUE || "dejavu-tacos";
   const backendURL =
     process.env.DEJAVU_BACKEND_URL || "http://localhost:8000";
 
@@ -16,12 +17,12 @@ async function main() {
   const worker = await Worker.create({
     connection,
     namespace: "default",
-    taskQueue: "dejavu-tacos",
+    taskQueue,
     workflowsPath: require.resolve("./workflows"),
     activities: createActivities(backend),
   });
 
-  console.log("TypeScript worker started, listening on task queue: dejavu-tacos");
+  console.log(`TypeScript worker started, listening on task queue: ${taskQueue}`);
   console.log(`Backend URL: ${backendURL}`);
   console.log(`Temporal address: ${temporalAddr}`);
 
